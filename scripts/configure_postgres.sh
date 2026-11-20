@@ -1,12 +1,12 @@
 #!/bin/bash
 TIMEFORMAT='%R %U %S'
-PGUSER="aa10733"
+PGUSER="postgres"
 PGDATABASE="$1"
 PGHOST="localhost"
-PGPORT=10000
+PGPORT=5432
 QUERY="$2"
 echo "PG QUERY STARTED"
-   { time /usr/bin/psql \
+   { time psql \
       -U "$PGUSER" \
       -h "$PGHOST" \
       -p "$PGPORT" \

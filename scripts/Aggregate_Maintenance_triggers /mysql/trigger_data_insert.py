@@ -1,3 +1,4 @@
+import os
 import argparse
 import csv
 import time
@@ -8,11 +9,11 @@ from tqdm import tqdm
 
 # === MySQL Configuration ===
 MYSQL_CONFIG = {
-    "host": "localhost",
+    "host": "127.0.0.1",
     "port": 3306,          # change if your MySQL runs on a different port
     "user": "root",        # change to your MySQL user
     "password": "pwd",     # change to your MySQL password
-    "database": "store_new_10_5",
+    "database": os.environ["DB"],
 }
 
 # Default path to the CSV file with order rows (adjust if needed)
@@ -104,7 +105,7 @@ def run_insert_experiment(tbl_file_path: str, mode: str):
     results_csv = root_dir / "results" / "mysql_aggregate_triggers_insert.csv"
     ensure_insert_results_csv(results_csv)
 
-    label = "with_trigger_insert" if mode == "with_trigger" else "without_trigger_insert"
+    label = os.environ.get("TAG", "") + ("with_trigger_insert" if mode == "with_trigger" else "without_trigger_insert")
 
     # --- Capture initial max ordernum before any experimental inserts ---
     init_conn = get_connection()

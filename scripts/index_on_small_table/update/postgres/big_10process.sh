@@ -1,3 +1,4 @@
+import os
 import psycopg2
 import multiprocessing
 import time
@@ -5,21 +6,33 @@ import csv
 import random
 from pathlib import Path
 
+import numpy as np
+from q1_fractal_symbols import gen
+
 # PostgreSQL connection details
 POSTGRES_DB_PARAMS = {
-    "host": "localhost",
-    "port": 5432,           # change if your Postgres runs on a different port
-    "user": "postgres",     # change to your Postgres user
-    "password": "pwd",      # change to your Postgres password
-    "dbname": "employees_small4",  # change DB name if needed
+    "host": "127.0.0.1",
+    "port": 5432,
+    "user": "postgres",
+    "password": "pwd",
+    "dbname": os.environ["DB"],
 }
 
-random.seed(42)
 
-CSV_FILE = "/data/tw3090/employee/employeesindex_small4.csv"  # Path to your CSV file
+def pick(updates, k, run_number):
+    rnd = random.Random(run_number)
+    hot = int(os.environ.get("HOT_KEYS", 0))
+    if not hot:
+        return rnd.sample(updates, k)
+    rows = rnd.sample(range(len(updates)), hot)
+    np.random.seed(run_number)
+    pool = [rows[i] for i in gen(0.3, hot)]
+    return [updates[i] for i in rnd.choices(pool, k=k)]
 
-# Results CSV (change path/name if needed)
-ROOT_DIR = Path(__file__).resolve().parents[5]  # repo root
+
+CSV_FILE = os.environ["CSV"]
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
 RESULTS_DIR = ROOT_DIR / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_CSV = RESULTS_DIR / "postgres_index_small_update_10process.csv"
@@ -39,11 +52,11 @@ def load_csv_data(csv_file, index_type, run_number):
         next(reader)  # skip header
         for row in reader:
             if index_type == "clustered":
-                condition_value = row[2]  # ssnum
+                condition_value = row[0]  # ssnum
             elif index_type == "nonclustered":
-                condition_value = row[4]  # hundreds2
+                condition_value = row[5]  # hundreds2
             else:  # scan
-                condition_value = row[5]  # longitude
+                condition_value = row[3]  # longitude
             modified_name = row[1] + str(run_number)
             updates.append((modified_name, condition_value))
     return updates
@@ -92,7 +105,7 @@ def run_experiment(index_type, run_number):
 
     updates = load_csv_data(CSV_FILE, index_type=index_type, run_number=run_number)
     # 10 processes * 100 updates each
-    sampled_updates = random.sample(updates, 1000)
+    sampled_updates = pick(updates, 1000, run_number)
     updates_split = [sampled_updates[i * 100:(i + 1) * 100] for i in range(10)]
 
     result_queue = multiprocessing.Queue()
@@ -124,7 +137,7 @@ def run_experiment(index_type, run_number):
         writer = csv.writer(f)
         writer.writerow([
             "postgres",
-            index_type,
+            os.environ.get("TAG", "") + index_type,
             run_number,
             f"{execution_time:.6f}",
             f"{response_time:.6f}",
@@ -135,7 +148,5 @@ if __name__ == "__main__":
     init_results_csv()
     for i in range(1, 11):
         run_experiment(index_type="scan", run_number=i)
-    for i in range(1, 11):
-        run_experiment(index_type="nonclustered", run_number=i)
     for i in range(1, 11):
         run_experiment(index_type="clustered", run_number=i)

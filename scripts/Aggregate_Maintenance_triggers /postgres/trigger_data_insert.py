@@ -1,3 +1,4 @@
+import os
 import argparse
 import csv
 import time
@@ -9,11 +10,11 @@ from tqdm import tqdm
 
 # === PostgreSQL Configuration ===
 POSTGRES_CONFIG = {
-    "host": "localhost",
+    "host": "127.0.0.1",
     "port": 5432,           # change if your Postgres runs on a different port
     "user": "postgres",     # change to your Postgres user
     "password": "pwd",      # change to your Postgres password
-    "dbname": "store_new_10_5",
+    "dbname": os.environ["DB"],
 }
 
 # Default path to the CSV file with order rows (adjust if needed)
@@ -101,7 +102,7 @@ def run_insert_experiment(tbl_file_path: str, mode: str):
     results_csv = root_dir / "results" / "postgres_aggregate_triggers_insert.csv"
     ensure_insert_results_csv(results_csv)
 
-    label = "with_trigger_insert" if mode == "with_trigger" else "without_trigger_insert"
+    label = os.environ.get("TAG", "") + ("with_trigger_insert" if mode == "with_trigger" else "without_trigger_insert")
 
     # --- Capture initial max ordernum before any experimental inserts ---
     init_conn = get_connection()

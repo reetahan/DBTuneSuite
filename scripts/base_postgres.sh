@@ -8,9 +8,9 @@ set -euo pipefail
 TIMEFORMAT='%R %U %S'
 
 # --- PostgreSQL Connection settings ---
-PGUSER="tw3090"
+PGUSER="postgres"
 PGHOST="localhost"
-PGPORT=10001
+PGPORT=5432
 # --------------------------------------
 
 PG_DB="$1"         # PostgreSQL database name
@@ -60,9 +60,10 @@ for i in $(seq 1 11); do
   # Replace placeholders {v1} and {v2}
   CURRENT_QUERY="${QUERY//\{v1\}/$value1}"
   CURRENT_QUERY="${CURRENT_QUERY//\{v2\}/$value2}"
+  CURRENT_QUERY=$(for _ in $(seq ${REPEAT:-1}); do printf "%s " "$CURRENT_QUERY"; done)
 
   # Time the execution
-  { time /usr/bin/psql \
+  { time psql \
       -U "$PGUSER" \
       -h "$PGHOST" \
       -p "$PGPORT" \
@@ -86,6 +87,7 @@ for i in $(seq 1 11); do
   fi
 
   read REAL_TIME USER_TIME SYS_TIME <<< "$TIME_LINE"
+  REAL_TIME=$(echo "scale=6; $REAL_TIME / ${REPEAT:-1}" | bc)
 
   REAL_TIME=$(printf "%.6f" "$REAL_TIME")
   USER_TIME=$(printf "%.6f" "$USER_TIME")

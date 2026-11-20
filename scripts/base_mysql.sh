@@ -1,15 +1,16 @@
 #!/bin/bash
-# Run a single SQL query against MySQL via Unix socket, 11 repetitions with timing
+# Run a single SQL query against MySQL, 11 repetitions with timing
 # Usage: bash base_mysql.sh database_name "query with {v1} and/or {v2}" [optional_label] [optional_output_csv]
 
 set -euo pipefail
 TIMEFORMAT='%R %U %S'
 
-# --- MySQL Connection Settings (via Unix Socket) ---
+# --- MySQL Connection Settings ---
 MYSQL_USER="root"     # Change to your MySQL username
-MYSQL_PASSWORD=""     # Change to your MySQL password (if any)
-MYSQL_SOCKET="/data/tw3090/mysql/mysql.sock"
-MYSQL_BIN="/home/tw3090/mysql/mysql-commercial-9.1.0-linux-glibc2.28-x86_64/bin/mysql"
+MYSQL_PASSWORD="pwd"  # Change to your MySQL password
+MYSQL_HOST="127.0.0.1"
+MYSQL_PORT=3306
+MYSQL_BIN="mysql"
 # ---------------------------------------------------
 
 MYSQL_DB="$1"   # Database name
@@ -49,11 +50,12 @@ for i in $(seq 1 11); do
   value2=$((value1 + 1000))
   CURRENT_QUERY="${QUERY//\{v1\}/$value1}"
   CURRENT_QUERY="${CURRENT_QUERY//\{v2\}/$value2}"
+  CURRENT_QUERY=$(for _ in $(seq ${REPEAT:-1}); do printf "%s " "$CURRENT_QUERY"; done)
 
-  # Run query via Unix socket with timing
+  # Run query with timing
   { time "$MYSQL_BIN" \
     -u "$MYSQL_USER" \
-    -S "$MYSQL_SOCKET" \
+    -h "$MYSQL_HOST" -P "$MYSQL_PORT" -p"$MYSQL_PASSWORD" \
     "$MYSQL_DB" -e "$CURRENT_QUERY" > /dev/null; } 2> mysql_time_output.log
 
   # If MySQL fails, print error and exit
@@ -73,6 +75,7 @@ for i in $(seq 1 11); do
   fi
 
   read REAL_TIME USER_TIME SYS_TIME <<< "$TIME_LINE"
+  REAL_TIME=$(echo "scale=6; $REAL_TIME / ${REPEAT:-1}" | bc)
   REAL_TIME=$(pad0 "$(printf "%.6f" "$REAL_TIME")")
   USER_TIME=$(pad0 "$(printf "%.6f" "$USER_TIME")")
   SYS_TIME=$(pad0 "$(printf "%.6f" "$SYS_TIME")")

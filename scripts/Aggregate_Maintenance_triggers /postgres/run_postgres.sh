@@ -7,11 +7,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-database_name="store_new_10_5"  # change if needed
-tbl_file_path="/data/tw3090/store/triggers_input.csv"  # change if needed
+database_name="${DB:?set DB}"
+tbl_file_path="${INS:?set INS}"
 
 # CSV for query timings (all base_postgres.sh runs)
-query_output_csv="$SCRIPT_DIR/../results/postgres_aggregate_triggers_queries.csv"  # change if needed
+query_output_csv="$SCRIPT_DIR/../results/postgres_aggregate_triggers_queries_${TAG:?set TAG}.csv"
 
 # Ensure results directory exists for this path
 mkdir -p "$(dirname "$query_output_csv")"
@@ -44,7 +44,7 @@ echo "=== Aggregate Maintenance experiment on PostgreSQL ==="
 echo ">>> Setting up triggers (WITH triggers)..."
 
 # NOTE: CREATE INDEX IF NOT EXISTS is supported on PostgreSQL 9.5+.
-read -r -d '' TRIGGER_SQL <<'SQL'
+read -r -d '' TRIGGER_SQL <<'SQL' || true
 CREATE INDEX IF NOT EXISTS i_item ON item(itemnum);
 
 -- Function to maintain vendorOutstanding
@@ -104,26 +104,20 @@ python "$SCRIPT_DIR/trigger_data_insert.py" \
 echo ">>> Measuring query performance WITH triggers using base_postgres.sh..."
 
 # Vendor outstanding lookups via maintained aggregate table
-vendor_id=10
-for i in $(seq 1 11); do
-  bash "$SCRIPT_DIR/../../base_postgres.sh" \
-    "$database_name" \
-    "SELECT amount FROM vendorOutstanding WHERE vendorid = '${vendor_id}';" \
-    "with_trigger_vendor" \
-    "$(basename "$query_output_csv")"
-  vendor_id=$((vendor_id + 1))
-done
+vendor_id=${VENDOR:-10}
+bash "$SCRIPT_DIR/../../base_postgres.sh" \
+  "$database_name" \
+  "SELECT amount FROM vendorOutstanding WHERE vendorid = '${vendor_id}';" \
+  "${TAG}with_trigger_vendor" \
+  "$(basename "$query_output_csv")"
 
 # Store outstanding lookups via maintained aggregate table
 store_id=10
-for i in $(seq 1 11); do
-  bash "$SCRIPT_DIR/../../base_postgres.sh" \
-    "$database_name" \
-    "SELECT amount FROM storeOutstanding WHERE storeid = '${store_id}';" \
-    "with_trigger_store" \
-    "$(basename "$query_output_csv")"
-  store_id=$((store_id + 1))
-done
+bash "$SCRIPT_DIR/../../base_postgres.sh" \
+  "$database_name" \
+  "SELECT amount FROM storeOutstanding WHERE storeid = '${store_id}';" \
+  "${TAG}with_trigger_store" \
+  "$(basename "$query_output_csv")"
 
 echo ">>> Restoring tables to pre-insertion state after WITH-triggers experiment..."
 
@@ -137,7 +131,7 @@ bash "$SCRIPT_DIR/../../configure_postgres.sh" \
 
 echo ">>> Dropping triggers and functions (WITHOUT triggers)..."
 
-read -r -d '' DROP_TRIGGERS_SQL <<'SQL'
+read -r -d '' DROP_TRIGGERS_SQL <<'SQL' || true
 DROP TRIGGER IF EXISTS updateVendorOutstanding ON orders;
 DROP TRIGGER IF EXISTS updateStoreOutstanding ON orders;
 DROP FUNCTION IF EXISTS update_vendor_outstanding();
@@ -157,33 +151,27 @@ python "$SCRIPT_DIR/trigger_data_insert.py" \
 echo ">>> Measuring query performance WITHOUT triggers using base_postgres.sh..."
 
 # Vendor aggregate using explicit join and SUM
-vendor_id=10
-for i in $(seq 1 11); do
-  bash "$SCRIPT_DIR/../../base_postgres.sh" \
-    "$database_name" \
-    "SELECT SUM(orders.quantity * item.price)
-     FROM orders
-     JOIN item ON orders.itemnum = item.itemnum
-     WHERE orders.vendorid = '${vendor_id}';" \
-    "without_trigger_vendor" \
-    "$(basename "$query_output_csv")"
-  vendor_id=$((vendor_id + 1))
-done
+vendor_id=${VENDOR:-10}
+bash "$SCRIPT_DIR/../../base_postgres.sh" \
+  "$database_name" \
+  "SELECT SUM(orders.quantity * item.price)
+   FROM orders
+   JOIN item ON orders.itemnum = item.itemnum
+   WHERE orders.vendorid = '${vendor_id}';" \
+  "${TAG}without_trigger_vendor" \
+  "$(basename "$query_output_csv")"
 
 # Store aggregate using explicit join and SUM
 store_id=10
-for i in $(seq 1 11); do
-  bash "$SCRIPT_DIR/../../base_postgres.sh" \
-    "$database_name" \
-    "SELECT SUM(orders.quantity * item.price)
-     FROM orders
-     JOIN item  ON orders.itemnum = item.itemnum
-     JOIN store ON orders.storeid = store.storeid
-     WHERE store.storeid = '${store_id}';" \
-    "without_trigger_store" \
-    "$(basename "$query_output_csv")"
-  store_id=$((store_id + 1))
-done
+bash "$SCRIPT_DIR/../../base_postgres.sh" \
+  "$database_name" \
+  "SELECT SUM(orders.quantity * item.price)
+   FROM orders
+   JOIN item  ON orders.itemnum = item.itemnum
+   JOIN store ON orders.storeid = store.storeid
+   WHERE store.storeid = '${store_id}';" \
+  "${TAG}without_trigger_store" \
+  "$(basename "$query_output_csv")"
 
 echo ">>> Restoring orders table to pre-insertion state after WITHOUT-triggers experiment..."
 
