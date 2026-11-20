@@ -3,3 +3,5 @@
 *.png
 *.tex
 data_generation/store/schema.sql
+__pycache__/
+*.pyc
