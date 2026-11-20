@@ -2,3 +2,4 @@
 *.log
 *.png
 *.tex
+data_generation/store/schema.sql
